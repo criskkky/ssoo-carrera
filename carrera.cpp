@@ -37,6 +37,10 @@ public:
         }
     }
 
+    int getId() const { return id; }
+    int getDistanciaRecorrida() const { return distanciaRecorrida; }
+    bool haTerminado() const { return terminado; }
+
 private:
     int id;
     int distanciaRecorrida;
@@ -64,9 +68,24 @@ public:
         for (auto& t : threads) {
             t.join();
         }
+
+        mostrarResultados();
     }
 
 private:
+    void mostrarResultados() {
+        std::sort(autos.begin(), autos.end(), [](const Auto& a, const Auto& b) {
+            return a.getDistanciaRecorrida() > b.getDistanciaRecorrida();
+        });
+
+        std::cout << "\nResultados finales:" << std::endl;
+        std::cout << "Lugar\tAuto" << std::endl;
+        std::cout << "----------------" << std::endl;
+        for (int i = 0; i < numAutos; ++i) {
+            std::cout << i + 1 << "\tAuto" << autos[i].getId() << std::endl;
+        }
+    }
+
     std::vector<Auto> autos;
     int distanciaTotal;
     int numAutos;
