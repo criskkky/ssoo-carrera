@@ -13,121 +13,100 @@ public:
     Auto(int id, int distanciaTotal) : id(id), distanciaRecorrida(0), distanciaTotal(distanciaTotal), terminado(false) {}
 
     // Método que simula el avance del auto
-    void avanzar() {
-        // Generadores aleatorios para simular el avance y la velocidad de cada auto
+    void avanzar(std::vector<int>& posiciones, std::mutex& posicionesMutex) {
         std::random_device rd; // Generador de números aleatorios
-        std::mt19937 gen(rd()); // Generador de números aleatorios
-        std::uniform_int_distribution<> distDist(1, 10); // Avance entre 1 y 10 metros
-        std::uniform_int_distribution<> velocidadDist(100, 500); // Tiempo de espera entre 100 y 500 ms
+        std::mt19937 gen(rd()); // Motor de números aleatorios
+        std::uniform_int_distribution<> distDist(1, 10); // Distribución uniforme para el avance
+        std::uniform_int_distribution<> velocidadDist(100, 500); // Distribución uniforme para la velocidad
 
-        // Mientras el auto no haya terminado la carrera
         while (!terminado) {
-            int avance = distDist(gen); // Calcular el avance aleatorio
-            distanciaRecorrida += avance; // Sumarlo a la distancia recorrida
+            int avance = distDist(gen); // Avance aleatorio entre 1 y 10 metros
+            distanciaRecorrida += avance; // Actualizar la distancia recorrida
 
-            // Si el auto ha recorrido la distancia total o más, se marca como terminado
-            if (distanciaRecorrida >= distanciaTotal) {
-                distanciaRecorrida = distanciaTotal;
-                terminado = true;
+            if (distanciaRecorrida >= distanciaTotal) { // Si la distancia recorrida supera la distancia total
+                distanciaRecorrida = distanciaTotal; // Ajustar la distancia recorrida a la distancia total
+                terminado = true; // Marcar el auto como terminado
             }
 
-            // Bloquear el acceso a la consola para evitar condiciones de carrera en las salidas
             {
-                std::lock_guard<std::mutex> lock(mutex);
-                std::cout << "Auto" << id << " avanza " << avance << " metros (total: " << distanciaRecorrida << " metros)" << std::endl;
-                if (terminado) {
-                    std::cout << "Auto" << id << " termina la carrera!" << std::endl;
+                std::lock_guard<std::mutex> lock(mutex); // Bloquear el acceso a la consola
+                std::cout << "Auto" << id << " avanza " << avance << " metros (total: " << distanciaRecorrida << " metros)" << std::endl; // Mostrar el avance del auto
+                if (terminado) { // Si el auto ha terminado la carrera
+                    std::cout << "Auto" << id << " termina la carrera!" << std::endl; // Mostrar un mensaje de finalización
+                    std::lock_guard<std::mutex> posicionesLock(posicionesMutex); // Bloquear el acceso al vector de posiciones
+                    posiciones.push_back(id); // Registrar la posición de llegada
                 }
             }
 
-            // Dormir el hilo durante un tiempo aleatorio para simular la velocidad del auto
-            std::this_thread::sleep_for(std::chrono::milliseconds(velocidadDist(gen)));
+            std::this_thread::sleep_for(std::chrono::milliseconds(velocidadDist(gen))); // Dormir un tiempo aleatorio para simular la velocidad
         }
     }
 
-    // Métodos getter para obtener información del auto
-    int getId() const { return id; }
-    int getDistanciaRecorrida() const { return distanciaRecorrida; }
-    bool haTerminado() const { return terminado; }
+    int getId() const { return id; } // Método para obtener el ID del auto
+    int getDistanciaRecorrida() const { return distanciaRecorrida; } // Método para obtener la distancia recorrida
+    bool haTerminado() const { return terminado; } // Método para verificar si el auto ha terminado la carrera
 
-private:
-    int id; // ID del auto
-    int distanciaRecorrida; // Distancia que ha recorrido hasta el momento
-    int distanciaTotal; // Distancia total que debe recorrer
-    bool terminado; // Indica si el auto ha terminado la carrera
-    static std::mutex mutex; // Mutex para proteger la salida por consola
+private: // Declaración de atributos privados
+    int id;
+    int distanciaRecorrida;
+    int distanciaTotal;
+    bool terminado;
+    static std::mutex mutex;
 };
 
-// Inicialización del mutex estático
-std::mutex Auto::mutex;
+std::mutex Auto::mutex; // Inicialización del mutex estático, mutex: protege el acceso a la consola.
 
-// Clase Carrera que gestiona la carrera y los autos participantes
 class Carrera {
 public:
-    // Constructor: inicializa la carrera con la distancia total y el número de autos
     Carrera(int distanciaTotal, int numAutos) : distanciaTotal(distanciaTotal), numAutos(numAutos) {
-        // Crear y agregar autos al vector
         for (int i = 0; i < numAutos; ++i) {
             autos.emplace_back(i, distanciaTotal);
         }
     }
 
-    // Método para iniciar la carrera
     void iniciar() {
-        std::vector<std::thread> threads; // Vector de hilos para ejecutar a cada auto
+        std::vector<std::thread> threads;
+        std::vector<int> posiciones; // Vector para registrar el orden de llegada
+        std::mutex posicionesMutex;  // Mutex para proteger el acceso a posiciones
 
-        // Crear un hilo para cada auto
         for (auto& auto_ : autos) {
-            threads.emplace_back(&Auto::avanzar, &auto_);
+            threads.emplace_back(&Auto::avanzar, &auto_, std::ref(posiciones), std::ref(posicionesMutex));
         }
 
-        // Esperar a que todos los hilos terminen (autos terminen la carrera)
         for (auto& t : threads) {
             t.join();
         }
 
-        // Mostrar los resultados finales de la carrera
-        mostrarResultados();
+        mostrarResultados(posiciones); // Mostrar los resultados según el orden de llegada
     }
 
 private:
-    // Método para mostrar los resultados finales ordenados por distancia recorrida
-    void mostrarResultados() {
-        // Ordenar los autos por la distancia recorrida (de mayor a menor)
-        std::sort(autos.begin(), autos.end(), [](const Auto& a, const Auto& b) {
-            return a.getDistanciaRecorrida() > b.getDistanciaRecorrida();
-        });
-
-        // Mostrar los resultados en orden
+    void mostrarResultados(const std::vector<int>& posiciones) {
         std::cout << "\nResultados finales:" << std::endl;
         std::cout << "Lugar\tAuto" << std::endl;
         std::cout << "----------------" << std::endl;
-        for (int i = 0; i < numAutos; ++i) {
-            std::cout << i + 1 << "\tAuto" << autos[i].getId() << std::endl;
+        for (size_t i = 0; i < posiciones.size(); ++i) {
+            std::cout << i + 1 << "\tAuto" << posiciones[i] << std::endl;
         }
     }
 
-    std::vector<Auto> autos; // Vector de autos participantes
+    std::vector<Auto> autos; // Vector de autos
     int distanciaTotal; // Distancia total de la carrera
-    int numAutos; // Número de autos en la carrera
+    int numAutos; // Número de autos
 };
 
-int main(int argc, char* argv[]) {
-    // Validar los argumentos de entrada
+int main(int argc, char* argv[]) { // argc: número de argumentos, argv: argumentos
     if (argc != 3) {
         std::cerr << "Uso: " << argv[0] << " <distancia_total> <numero_de_autos>" << std::endl;
         return 1;
     }
 
-    // Obtener la distancia total y el número de autos de los argumentos
-    int distanciaTotal = std::stoi(argv[1]);
-    int numAutos = std::stoi(argv[2]);
+    int distanciaTotal = std::stoi(argv[1]); // Convertir el primer argumento a entero
+    int numAutos = std::stoi(argv[2]); // Convertir el segundo argumento a entero
 
-    // Mostrar los detalles de la carrera
     std::cout << "Distancia total carrera: " << distanciaTotal << " metros" << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 
-    // Crear e iniciar la carrera
     Carrera carrera(distanciaTotal, numAutos);
     carrera.iniciar();
 
