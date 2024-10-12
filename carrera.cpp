@@ -95,20 +95,37 @@ private:
     int numAutos; // Número de autos
 };
 
-int main(int argc, char* argv[]) { // argc: número de argumentos, argv: argumentos
+int main(int argc, char* argv[]) {
+    // Verificar que el número de argumentos sea correcto (3: el nombre del programa, la distancia total y el número de autos)
     if (argc != 3) {
         std::cerr << "Uso: " << argv[0] << " <distancia_total> <numero_de_autos>" << std::endl;
-        return 1;
+        return 1; // Salir si no se proporcionan los argumentos necesarios
     }
 
-    int distanciaTotal = std::stoi(argv[1]); // Convertir el primer argumento a entero
-    int numAutos = std::stoi(argv[2]); // Convertir el segundo argumento a entero
+    // Convertir los argumentos de entrada (cadena de caracteres) a enteros
+    int distanciaTotal = std::stoi(argv[1]);
+    int numAutos = std::stoi(argv[2]);
 
+    // Obtener el número máximo de hilos que el hardware puede soportar simultáneamente
+    int numMaxHilos = std::thread::hardware_concurrency();
+
+    // Verificar si el número de autos es demasiado grande para el sistema
+    if (numAutos > numMaxHilos * 2) {
+        std::cerr << "El número de autos es demasiado alto para tu sistema. "
+                  << "Intenta con un número menor o igual a " << numMaxHilos * 2 << "." << std::endl;
+        return 1; // Terminar el programa si hay demasiados autos
+    }
+
+    // Mostrar la configuración de la carrera en la consola
     std::cout << "Distancia total carrera: " << distanciaTotal << " metros" << std::endl;
+    std::cout << "Número de autos: " << numAutos << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 
+    // Crear la carrera con la distancia total y el número de autos
     Carrera carrera(distanciaTotal, numAutos);
+
+    // Iniciar la simulación de la carrera
     carrera.iniciar();
 
-    return 0;
+    return 0; // Indicar que el programa terminó correctamente
 }
